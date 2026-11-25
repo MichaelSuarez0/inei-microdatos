@@ -114,8 +114,11 @@ from inei_microdatos.catalog import filter_catalog
 census = filter_catalog(load_catalog(), survey="censo2025")
 download_modules(census, dest="./data", ubigeo="150101")
 tables = read_catalog_entry(
-    census[0], "2025", module="Indicadores demográficos",
-    dest="./cache", ubigeo="150101",
+    census[0],
+    "2025",
+    module="Indicadores demográficos",
+    dest="./cache",
+    ubigeo="150101",
 )
 # Cada DataFrame incluye ubigeo, census_year y geography en .attrs.
 ```
@@ -269,8 +272,11 @@ from inei_microdatos.catalog import filter_catalog
 census = filter_catalog(load_catalog(), survey="censo2025")
 download_modules(census, dest="./data", ubigeo="150101")
 tables = read_catalog_entry(
-    census[0], "2025", module="Indicadores demográficos",
-    dest="./cache", ubigeo="150101",
+    census[0],
+    "2025",
+    module="Indicadores demográficos",
+    dest="./cache",
+    ubigeo="150101",
 )
 # Each DataFrame records ubigeo, census_year, and geography in .attrs.
 ```

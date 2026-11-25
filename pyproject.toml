@@ -44,3 +44,12 @@ inei-microdatos = "inei_microdatos.cli:cli"
 
 [project.urls]
 Homepage = "https://github.com/fiorellarmartins/inei-microdatos"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.6",
+]
+
+[tool.ruff.lint]
+select = ["F", "I", "E"]
+ignore = ["E501"]

@@ -1,18 +1,25 @@
 """Programmatic access to INEI Peru's microdata portal."""
 
+from inei_microdatos.catalog import (
+    build_catalog,
+    catalog_age,
+    load_catalog,
+    save_catalog,
+)
 from inei_microdatos.client import INEIClient
-from inei_microdatos.catalog import build_catalog, load_catalog, save_catalog, catalog_age
-from inei_microdatos.download import download_modules, download_docs, LAYOUTS
-from inei_microdatos.reader import read_module, read_catalog_entry, list_tables
-from inei_microdatos.variables import search as search_variables, search_across_years
+from inei_microdatos.download import LAYOUTS, download_docs, download_modules
 from inei_microdatos.geography import select_census_geography
+from inei_microdatos.reader import list_tables, read_catalog_entry, read_module
 from inei_microdatos.survey_geography import geography_capabilities, select_geography
+from inei_microdatos.variables import search as search_variables
+from inei_microdatos.variables import search_across_years
 
 __version__ = "0.5.0"
 __all__ = [
     "INEIClient",
     "build_catalog",
     "load_catalog",
+    "catalog_age",
     "save_catalog",
     "download_modules",
     "download_docs",
@@ -23,4 +30,6 @@ __all__ = [
     "select_census_geography",
     "select_geography",
     "geography_capabilities",
+    "search_across_years",
+    "search_variables",
 ]

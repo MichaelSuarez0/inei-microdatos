@@ -5,14 +5,14 @@ from __future__ import annotations
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Literal, Optional
 from threading import Lock, RLock
+from typing import Literal, Optional
 
 import requests
 from tqdm import tqdm
 
 from inei_microdatos._dependencies import assert_optional_import
-from inei_microdatos.client import DOWNLOAD_BASE, BASE_URL
+from inei_microdatos.client import DOWNLOAD_BASE
 
 _TIMEOUT = 120
 _CHUNK = 8192
@@ -23,10 +23,10 @@ _PATH_LOCKS_GUARD = Lock()
 # Folder layout presets.
 # Placeholders: {survey}, {year}, {period}, {code}, {module_name}, {format}
 LAYOUTS = {
-    "default":  "{survey}/{year}/{period}/{code}.zip",
-    "flat":     "{survey}/{code}.zip",
-    "by-year":  "{survey}/{year}/{code}.zip",
-    "by-format":"{format}/{survey}/{year}/{code}.zip",
+    "default": "{survey}/{year}/{period}/{code}.zip",
+    "flat": "{survey}/{code}.zip",
+    "by-year": "{survey}/{year}/{code}.zip",
+    "by-format": "{format}/{survey}/{year}/{code}.zip",
 }
 
 
@@ -63,11 +63,14 @@ def download_modules(
     """
     fmt = fmt.upper()
     if fmt not in ("CSV", "STATA", "SPSS", "XLSX", "XLS"):
-        raise ValueError(f"Invalid format: {fmt}. Must be CSV, STATA, SPSS, XLSX, or XLS.")
+        raise ValueError(
+            f"Invalid format: {fmt}. Must be CSV, STATA, SPSS, XLSX, or XLS."
+        )
 
     template = LAYOUTS.get(layout, layout)
     if ubigeo is not None:
         from inei_microdatos.survey_geography import select_geography
+
         catalog = select_geography(catalog, ubigeo)
     tasks = _collect_module_tasks(catalog, dest, fmt, fallback, template)
     if dry_run:
@@ -115,8 +118,14 @@ def module_download(mod: dict, fmt: str, fallback: bool = True):
         raise ValueError(f"Invalid format: {fmt}")
     if mod.get("survey_geography_query"):
         if fmt != "CSV" and not fallback:
-            raise ValueError("Derived survey subsets use CSV; choose CSV or enable format fallback")
-        code = (mod.get("csv_code") or mod["module_code"]) + "-ubigeo-" + mod["geography"]["code"]
+            raise ValueError(
+                "Derived survey subsets use CSV; choose CSV or enable format fallback"
+            )
+        code = (
+            (mod.get("csv_code") or mod["module_code"])
+            + "-ubigeo-"
+            + mod["geography"]["code"]
+        )
         return mod["survey_geography_query"], code, "CSV", ".zip"
     order = {
         "CSV": ("CSV", "STATA", "SPSS", "XLSX", "XLS"),
@@ -141,12 +150,20 @@ def module_download(mod: dict, fmt: str, fallback: bool = True):
         else:
             archive_code = mod.get(_FORMAT_KEYS[actual_fmt])
             if archive_code:
-                return f"{DOWNLOAD_BASE}{actual_fmt}/{archive_code}.zip", archive_code, actual_fmt, ".zip"
+                return (
+                    f"{DOWNLOAD_BASE}{actual_fmt}/{archive_code}.zip",
+                    archive_code,
+                    actual_fmt,
+                    ".zip",
+                )
     return None
 
 
 def _collect_module_tasks(
-    catalog: list[dict], dest: str | Path, fmt: str, fallback: bool,
+    catalog: list[dict],
+    dest: str | Path,
+    fmt: str,
+    fallback: bool,
     template: str,
 ) -> list[tuple[str | dict, Path]]:
     dest = Path(dest)
@@ -172,18 +189,45 @@ def _collect_module_tasks(
                     if mod.get("geography"):
                         # Isolate selections even when a custom layout omits {code}.
                         rel_path = Path(rel)
-                        rel = str(rel_path.parent / ("ubigeo-" + mod["geography"]["code"]) / rel_path.name)
-                        if isinstance(url, dict) and url.get("kind") == "census_geography":
-                            url = dict(url, source_path=str(dest / rel_path.parent / (mod["module_code"] + ".xlsx")))
-                        elif isinstance(url, dict) and url.get("kind") == "survey_geography":
-                            url = dict(url, source_path=str(dest / rel_path.parent / ".geography-sources" /
-                                                           "CSV" / (url["module_code"] + ".zip")))
+                        rel = str(
+                            rel_path.parent
+                            / ("ubigeo-" + mod["geography"]["code"])
+                            / rel_path.name
+                        )
+                        if (
+                            isinstance(url, dict)
+                            and url.get("kind") == "census_geography"
+                        ):
+                            url = dict(
+                                url,
+                                source_path=str(
+                                    dest
+                                    / rel_path.parent
+                                    / (mod["module_code"] + ".xlsx")
+                                ),
+                            )
+                        elif (
+                            isinstance(url, dict)
+                            and url.get("kind") == "survey_geography"
+                        ):
+                            url = dict(
+                                url,
+                                source_path=str(
+                                    dest
+                                    / rel_path.parent
+                                    / ".geography-sources"
+                                    / "CSV"
+                                    / (url["module_code"] + ".zip")
+                                ),
+                            )
                     tasks.append((url, dest / rel))
     return tasks
 
 
 def _collect_doc_tasks(
-    catalog: list[dict], dest: str | Path, template: str,
+    catalog: list[dict],
+    dest: str | Path,
+    template: str,
 ) -> list[tuple[str, Path]]:
     dest = Path(dest)
     tasks = []
@@ -225,7 +269,9 @@ def _run_downloads(
     bar = tqdm(total=len(tasks), desc=desc, disable=not progress)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_download_one, url, path): (url, path) for url, path in tasks}
+        futures = {
+            pool.submit(_download_one, url, path): (url, path) for url, path in tasks
+        }
         for future in as_completed(futures):
             result = future.result()
             if result not in stats:
@@ -241,12 +287,15 @@ def _run_downloads(
 def _valid_download(path: Path) -> bool:
     if path.suffix.lower() == ".xls":
         from inei_microdatos.reader import _valid_legacy_excel
+
         return _valid_legacy_excel(path)
     if not zipfile.is_zipfile(path):
         return False
     if path.suffix.lower() == ".xlsx":
         with zipfile.ZipFile(path) as workbook:
-            return {"[Content_Types].xml", "xl/workbook.xml"}.issubset(workbook.namelist())
+            return {"[Content_Types].xml", "xl/workbook.xml"}.issubset(
+                workbook.namelist()
+            )
     return True
 
 
@@ -260,6 +309,7 @@ def _download_one(url: str | dict, dest: Path) -> str:
 
 def _download_one_locked(url: str | dict, dest: Path) -> str:
     from inei_microdatos.geography import GeographyUnavailable
+
     if isinstance(url, dict) and url.get("kind") == "geography_unavailable":
         return "unavailable"
     if dest.exists():
@@ -267,6 +317,7 @@ def _download_one_locked(url: str | dict, dest: Path) -> str:
             if not isinstance(url, dict) or url.get("kind") != "survey_geography":
                 return "skipped"
             from inei_microdatos.survey_geography import matching_subset
+
             if matching_subset(dest, url):
                 return "skipped"
 
@@ -277,18 +328,31 @@ def _download_one_locked(url: str | dict, dest: Path) -> str:
             outcome = "ok"
             if isinstance(url, dict) and url.get("kind") == "survey_geography":
                 from inei_microdatos.survey_geography import subset_survey_archive
-                raw = Path(url.get("source_path", dest.parent / ".geography-sources" / "CSV" / (url["module_code"] + ".zip")))
+
+                raw = Path(
+                    url.get(
+                        "source_path",
+                        dest.parent
+                        / ".geography-sources"
+                        / "CSV"
+                        / (url["module_code"] + ".zip"),
+                    )
+                )
                 if _download_one(url["url"], raw) not in ("ok", "skipped"):
                     raise OSError("Could not download source survey archive")
                 outcome = subset_survey_archive(raw, dest, url)
             elif isinstance(url, dict) and url.get("kind") == "census_geography":
                 from inei_microdatos.geography import subset_workbook
-                raw = Path(url.get("source_path", dest.parent / (url["module_code"] + ".xlsx")))
+
+                raw = Path(
+                    url.get("source_path", dest.parent / (url["module_code"] + ".xlsx"))
+                )
                 if _download_one(url["url"], raw) not in ("ok", "skipped"):
                     raise OSError("Could not download source census workbook")
                 subset_workbook(raw, dest, url["geography"])
             elif isinstance(url, dict):
                 from inei_microdatos.redatam import export_excel
+
                 dest.write_bytes(export_excel(url))
             else:
                 r = requests.get(url, timeout=_TIMEOUT, stream=True)
@@ -325,6 +389,7 @@ def _dry_run_report(tasks: list) -> dict:
         cached = path.exists() and path.stat().st_size > 0 and _valid_download(path)
         if cached and isinstance(url, dict) and url.get("kind") == "survey_geography":
             from inei_microdatos.survey_geography import matching_subset
+
             cached = matching_subset(path, url)
         if cached:
             would_skip += 1
@@ -332,9 +397,17 @@ def _dry_run_report(tasks: list) -> dict:
             would_download += 1
             if isinstance(url, dict) and url.get("kind") == "survey_geography":
                 print(f"  {url['url']} -> derived CSV subset, ubigeo {url['code']}")
-                parents = sorted({t["parent_code"] for t in url["rule"]["tables"] if t.get("parent_code")})
+                parents = sorted(
+                    {
+                        t["parent_code"]
+                        for t in url["rule"]["tables"]
+                        if t.get("parent_code")
+                    }
+                )
                 if parents:
-                    print(f"    Geographic dependencies (reused when cached): {', '.join(parents)}")
+                    print(
+                        f"    Geographic dependencies (reused when cached): {', '.join(parents)}"
+                    )
             else:
                 print(f"  {url}")
             print(f"    -> {path}")

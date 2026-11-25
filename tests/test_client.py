@@ -70,7 +70,10 @@ def test_parse_modules():
 def test_module_download_url():
     m = Module("968", "1629", "Hogar", csv_code="968-Modulo1629")
     url = m.download_url("CSV")
-    assert url == "https://proyectos.inei.gob.pe/iinei/srienaho/descarga/CSV/968-Modulo1629.zip"
+    assert (
+        url
+        == "https://proyectos.inei.gob.pe/iinei/srienaho/descarga/CSV/968-Modulo1629.zip"
+    )
     assert m.download_url("STATA") is None
 
 

@@ -19,38 +19,46 @@ ENTRY_PAGE = "Consulta_por_Encuesta.asp?CU=19558"
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Survey:
-    category: str        # ENAHO Anterior | ENAHO Actualizada | EPEN | Standalone
-    value: str           # the raw <option> value sent to the server
-    label: str           # display name
+    category: str  # ENAHO Anterior | ENAHO Actualizada | EPEN | Standalone
+    value: str  # the raw <option> value sent to the server
+    label: str  # display name
+
 
 @dataclass
 class Period:
-    value: str           # period code sent to AJAX
-    label: str           # e.g. "Anual - (Ene-Dic)", "Trimestre 1"
+    value: str  # period code sent to AJAX
+    label: str  # e.g. "Anual - (Ene-Dic)", "Trimestre 1"
+
 
 @dataclass
 class Module:
-    survey_code: str     # e.g. "966"
-    module_code: str     # e.g. "01", "1629"
+    survey_code: str  # e.g. "966"
+    module_code: str  # e.g. "01", "1629"
     name: str
-    csv_code: Optional[str] = None    # e.g. "966-Modulo01"
+    csv_code: Optional[str] = None  # e.g. "966-Modulo01"
     stata_code: Optional[str] = None
     spss_code: Optional[str] = None
 
     def download_url(self, fmt: str = "CSV") -> Optional[str]:
-        code = {"CSV": self.csv_code, "STATA": self.stata_code, "SPSS": self.spss_code}.get(fmt.upper())
+        code = {
+            "CSV": self.csv_code,
+            "STATA": self.stata_code,
+            "SPSS": self.spss_code,
+        }.get(fmt.upper())
         if not code:
             return None
         return f"{DOWNLOAD_BASE}{fmt.upper()}/{code}.zip"
+
 
 @dataclass
 class Doc:
     code: str
     name: str
-    zip_path: Optional[str] = None        # relative: "2024-5/CuestionarioHogar.zip"
-    ficha_params: Optional[list] = None   # [CE, MO, year, period, docname]
+    zip_path: Optional[str] = None  # relative: "2024-5/CuestionarioHogar.zip"
+    ficha_params: Optional[list] = None  # [CE, MO, year, period, docname]
 
     def zip_url(self) -> Optional[str]:
         if not self.zip_path:
@@ -62,6 +70,7 @@ class Doc:
             return None
         return f"{BASE_URL}VerificaFicha.asp?CE={self.ficha_params[0]}&MO={self.ficha_params[1]}"
 
+
 @dataclass
 class PeriodData:
     period: Period
@@ -72,6 +81,7 @@ class PeriodData:
 # ---------------------------------------------------------------------------
 # HTML parsing
 # ---------------------------------------------------------------------------
+
 
 class _OptionParser(HTMLParser):
     def __init__(self):
@@ -119,12 +129,16 @@ def _parse_modules(html: str) -> list[Module]:
         csv = re.findall(r"descarga/CSV/([^.]+)\.zip", row)
         dta = re.findall(r"descarga/STATA/([^.]+)\.zip", row)
         sps = re.findall(r"descarga/SPSS/([^.]+)\.zip", row)
-        modules.append(Module(
-            survey_code=sc, module_code=mc, name=mn,
-            csv_code=csv[0] if csv else None,
-            stata_code=dta[0] if dta else None,
-            spss_code=sps[0] if sps else None,
-        ))
+        modules.append(
+            Module(
+                survey_code=sc,
+                module_code=mc,
+                name=mn,
+                csv_code=csv[0] if csv else None,
+                stata_code=dta[0] if dta else None,
+                spss_code=sps[0] if sps else None,
+            )
+        )
     return modules
 
 
@@ -142,18 +156,24 @@ def _parse_docs(html: str) -> list[Doc]:
         if not dc.isdigit() or "&" in tds[5]:
             continue
         zips = re.findall(r"/iinei/srienaho/descarga/DocumentosZIP/([^\"'<>\s]+)", row)
-        fp = re.findall(r"VerFicha\('([^']+)','([^']+)','([^']+)','([^']+)','([^']+)'\)", row)
-        docs.append(Doc(
-            code=dc, name=dn,
-            zip_path=zips[0] if zips else None,
-            ficha_params=list(fp[0]) if fp else None,
-        ))
+        fp = re.findall(
+            r"VerFicha\('([^']+)','([^']+)','([^']+)','([^']+)','([^']+)'\)", row
+        )
+        docs.append(
+            Doc(
+                code=dc,
+                name=dn,
+                zip_path=zips[0] if zips else None,
+                ficha_params=list(fp[0]) if fp else None,
+            )
+        )
     return docs
 
 
 # ---------------------------------------------------------------------------
 # JS-style escape (critical for Windows-1252 characters like \x96 en-dash)
 # ---------------------------------------------------------------------------
+
 
 def js_escape(s: str) -> str:
     """Replicate JavaScript's escape() — encodes to %XX for chars <= 0xFF,
@@ -175,13 +195,16 @@ def js_escape(s: str) -> str:
 # Client
 # ---------------------------------------------------------------------------
 
+
 class INEIClient:
     """Wraps a requests.Session and provides methods to interact with the
     INEI microdatos AJAX endpoints."""
 
     def __init__(self, delay: float = 0.2):
         self.session = requests.Session()
-        self.session.headers.update({"Content-Type": "application/x-www-form-urlencoded"})
+        self.session.headers.update(
+            {"Content-Type": "application/x-www-form-urlencoded"}
+        )
         self.delay = delay
         self._initialized = False
 
@@ -209,8 +232,9 @@ class INEIClient:
 
         def _extract_select(name: str) -> list[tuple[str, str]]:
             m = re.search(
-                rf'<select[^>]*(?:name|id)=["\']' + name + r'["\'][^>]*>(.*?)</select>',
-                html, re.DOTALL | re.I,
+                r'<select[^>]*(?:name|id)=["\']' + name + r'["\'][^>]*>(.*?)</select>',
+                html,
+                re.DOTALL | re.I,
             )
             return _parse_options(m.group(1)) if m else []
 

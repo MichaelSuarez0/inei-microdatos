@@ -79,14 +79,26 @@ def test_spss_requires_pyreadstat(monkeypatch):
 
 def test_build_index_requires_pyreadstat_before_downloading(monkeypatch, tmp_path):
     block_module(monkeypatch, "pyreadstat")
-    catalog = [{
-        "value": "Example",
-        "label": "Example",
-        "category": "Household",
-        "years": {"2024": {"Annual": {"modules": [
-            {"module_code": "1", "module_name": "Example module", "stata_code": "1"},
-        ]}}},
-    }]
+    catalog = [
+        {
+            "value": "Example",
+            "label": "Example",
+            "category": "Household",
+            "years": {
+                "2024": {
+                    "Annual": {
+                        "modules": [
+                            {
+                                "module_code": "1",
+                                "module_name": "Example module",
+                                "stata_code": "1",
+                            },
+                        ]
+                    }
+                }
+            },
+        }
+    ]
     with pytest.raises(OptionalDependencyMissingError) as excinfo:
         build_index(catalog, dest=tmp_path / "index.gz", progress=False)
     show_message(excinfo)
@@ -108,24 +120,35 @@ def test_legacy_xls_validation_does_not_require_pandas(monkeypatch, tmp_path):
     block_module(monkeypatch, "pandas")
     block_module(monkeypatch, "openpyxl")
     path = tmp_path / "legacy.xls"
-    path.write_bytes(
-        b"<table id='tabDetalle'><tr><td>PERU</td><td>1</td></tr></table>"
-    )
+    path.write_bytes(b"<table id='tabDetalle'><tr><td>PERU</td><td>1</td></tr></table>")
     assert _valid_download(path)
     assert list_tables(path)[0]["name"] == "tabDetalle"
 
 
 def test_build_index_requires_openpyxl_for_census_workbooks(monkeypatch, tmp_path):
     block_module(monkeypatch, "openpyxl")
-    catalog = [{
-        "value": "Census",
-        "label": "Census",
-        "category": "Census",
-        "data_kind": "aggregate_tables",
-        "years": {"2025": {"Unico": {"source_url": "https://example.org/", "modules": [
-            {"module_code": "1", "module_name": "Example table", "xlsx_url": "https://example.org/1.xlsx"},
-        ]}}},
-    }]
+    catalog = [
+        {
+            "value": "Census",
+            "label": "Census",
+            "category": "Census",
+            "data_kind": "aggregate_tables",
+            "years": {
+                "2025": {
+                    "Unico": {
+                        "source_url": "https://example.org/",
+                        "modules": [
+                            {
+                                "module_code": "1",
+                                "module_name": "Example table",
+                                "xlsx_url": "https://example.org/1.xlsx",
+                            },
+                        ],
+                    }
+                }
+            },
+        }
+    ]
     with pytest.raises(OptionalDependencyMissingError) as excinfo:
         build_index(catalog, dest=tmp_path / "index.gz", progress=False)
     show_message(excinfo)

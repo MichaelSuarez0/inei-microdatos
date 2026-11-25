@@ -42,7 +42,8 @@ def search(
         index = load_index()
 
     query_lower = query.lower()
-    from inei_microdatos.aliases import resolve_alias, ALIAS_YEARS
+    from inei_microdatos.aliases import ALIAS_YEARS, resolve_alias
+
     alias_year = ALIAS_YEARS.get(survey.lower()) if survey else None
     if alias_year is not None:
         if year is not None and str(year) != str(alias_year):
@@ -166,14 +167,14 @@ def build_index(
     if dest.exists():
         existing = _read_index_file(dest)
     existing_keys = set(
-        (e["survey"], e["year"], e["period"], e["module_code"])
-        for e in existing
+        (e["survey"], e["year"], e["period"], e["module_code"]) for e in existing
     )
 
     modules = _collect_modules(catalog)
     # Skip already-indexed modules
     to_index = [
-        m for m in modules
+        m
+        for m in modules
         if (m["survey"], m["year"], m["period"], m["module_code"]) not in existing_keys
     ]
 
@@ -189,7 +190,10 @@ def build_index(
     bar = tqdm(total=len(to_index), desc="Indexing", disable=not progress)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_index_one_module, mod, data_dir=data_dir): mod for mod in to_index}
+        futures = {
+            pool.submit(_index_one_module, mod, data_dir=data_dir): mod
+            for mod in to_index
+        }
         for future in as_completed(futures):
             bar.update(1)
             try:
@@ -199,7 +203,11 @@ def build_index(
                     bar.set_postfix(indexed=len(new_entries))
             except Exception as exc:
                 import warnings
-                warnings.warn(f"Could not index {futures[future]['module_code']}: {exc}", RuntimeWarning)
+
+                warnings.warn(
+                    f"Could not index {futures[future]['module_code']}: {exc}",
+                    RuntimeWarning,
+                )
 
     bar.close()
 
@@ -216,31 +224,46 @@ def _collect_modules(catalog: list) -> list:
             for period_label, period_data in year_data.items():
                 for mod in period_data["modules"]:
                     if entry.get("data_kind") == "aggregate_tables":
-                        if mod.get("redatam_query") or mod.get("xlsx_url") or mod.get("xls_url"):
-                            modules.append({
-                                "survey": entry["label"], "category": entry["category"],
-                                "year": year, "period": period_label,
-                                "module_code": mod["module_code"],
-                                "module_name": mod["module_name"],
-                                "format": "XLSX" if mod.get("xlsx_url") else "XLS",
-                                "source_url": period_data["source_url"], "census_module": mod,
-                            })
+                        if (
+                            mod.get("redatam_query")
+                            or mod.get("xlsx_url")
+                            or mod.get("xls_url")
+                        ):
+                            modules.append(
+                                {
+                                    "survey": entry["label"],
+                                    "category": entry["category"],
+                                    "year": year,
+                                    "period": period_label,
+                                    "module_code": mod["module_code"],
+                                    "module_name": mod["module_name"],
+                                    "format": "XLSX" if mod.get("xlsx_url") else "XLS",
+                                    "source_url": period_data["source_url"],
+                                    "census_module": mod,
+                                }
+                            )
                         continue
                     code = mod.get("stata_code") or mod.get("spss_code")
                     if not code:
                         continue
                     fmt = "STATA" if mod.get("stata_code") else "SPSS"
-                    alt_code = mod.get("spss_code") if fmt == "STATA" else mod.get("stata_code")
-                    modules.append({
-                        "survey": entry["label"],
-                        "category": entry["category"],
-                        "year": year,
-                        "period": period_label,
-                        "module_code": code,
-                        "module_name": mod.get("module_name", ""),
-                        "format": fmt,
-                        "alt_code": alt_code,
-                    })
+                    alt_code = (
+                        mod.get("spss_code")
+                        if fmt == "STATA"
+                        else mod.get("stata_code")
+                    )
+                    modules.append(
+                        {
+                            "survey": entry["label"],
+                            "category": entry["category"],
+                            "year": year,
+                            "period": period_label,
+                            "module_code": code,
+                            "module_name": mod.get("module_name", ""),
+                            "format": fmt,
+                            "alt_code": alt_code,
+                        }
+                    )
     return modules
 
 
@@ -248,11 +271,13 @@ def _index_one_module(mod_info: dict, data_dir=None) -> Optional[dict]:
     """Download one module ZIP, extract metadata, delete ZIP. Returns index entry."""
     if "census_module" in mod_info:
         from inei_microdatos.census_index import index_census_module
+
         return index_census_module(mod_info, data_dir=data_dir)
 
-    import requests
-    import zipfile
     import io
+    import zipfile
+
+    import requests
 
     code = mod_info["module_code"]
     fmt = mod_info["format"]
@@ -289,9 +314,9 @@ def _index_one_module(mod_info: dict, data_dir=None) -> Optional[dict]:
 def _extract_metadata(zf, filename: str, ext: str, mod_info: dict) -> dict:
     """Extract variable metadata from a data file inside a ZIP."""
     assert_optional_import("pyreadstat", extra="pandas", min_version="1.0")
-    import pyreadstat
-    import tempfile
     import os
+
+    import pyreadstat
 
     with zf.open(filename) as f:
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
@@ -337,6 +362,7 @@ def _extract_metadata(zf, filename: str, ext: str, mod_info: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
 
 def _make_result(entry: dict, var: dict) -> dict:
     return {

@@ -40,7 +40,11 @@ def read_module(
     source = str(source)
 
     # If it's a download code (not a file path), download to a temp location
-    if not source.lower().endswith((".zip", ".xlsx", ".xls")) and "/" not in source and "\\" not in source:
+    if (
+        not source.lower().endswith((".zip", ".xlsx", ".xls"))
+        and "/" not in source
+        and "\\" not in source
+    ):
         source = _download_to_temp(source, fmt)
 
     path = Path(source)
@@ -49,9 +53,11 @@ def read_module(
 
     if path.suffix.lower() == ".xls":
         name = _legacy_table_name(path)
-        return {name: _read_legacy_excel(path)} if not tables or any(
-            t.lower() in name.lower() for t in tables
-        ) else {}
+        return (
+            {name: _read_legacy_excel(path)}
+            if not tables or any(t.lower() in name.lower() for t in tables)
+            else {}
+        )
 
     if path.suffix.lower() == ".xlsx":
         assert_optional_import("openpyxl", extra="pandas", min_version="3.1")
@@ -66,7 +72,11 @@ def read_module(
 
     with zipfile.ZipFile(path) as zf:
         data_files = _find_data_files(zf.namelist())
-        report = json.loads(zf.read("geography.json")) if "geography.json" in zf.namelist() else None
+        report = (
+            json.loads(zf.read("geography.json"))
+            if "geography.json" in zf.namelist()
+            else None
+        )
         report_tables = {t["file"]: t for t in report["tables"]} if report else {}
 
         for name, detected_fmt, table_name in data_files:
@@ -79,10 +89,18 @@ def read_module(
             use_fmt = fmt or detected_fmt
             if report and name in report_tables:
                 info = report_tables[name]
-                df = pd.read_csv(data, encoding="utf-8", low_memory=False,
-                                 dtype={c: "string" for c in info["text_columns"]})
-                df.attrs.update(ubigeo=report["ubigeo"], survey_year=report["year"],
-                                geography_report=report, geographic_rows=info)
+                df = pd.read_csv(
+                    data,
+                    encoding="utf-8",
+                    low_memory=False,
+                    dtype={c: "string" for c in info["text_columns"]},
+                )
+                df.attrs.update(
+                    ubigeo=report["ubigeo"],
+                    survey_year=report["year"],
+                    geography_report=report,
+                    geographic_rows=info,
+                )
             else:
                 df = _read_data(data, use_fmt, name)
             result[table_name] = df
@@ -117,7 +135,10 @@ def read_catalog_entry(
     year = str(year)
     if ubigeo is not None:
         from inei_microdatos.survey_geography import select_geography
-        scoped = dict(catalog_entry, years={year: catalog_entry.get("years", {}).get(year, {})})
+
+        scoped = dict(
+            catalog_entry, years={year: catalog_entry.get("years", {}).get(year, {})}
+        )
         if not scoped["years"][year]:
             raise ValueError(f"Year {year} not available")
         catalog_entry = select_geography([scoped], ubigeo)[0]
@@ -134,7 +155,9 @@ def read_catalog_entry(
             None,
         )
         if not period_data:
-            raise ValueError(f"Period '{period}' not found. Available: {list(year_data.keys())}")
+            raise ValueError(
+                f"Period '{period}' not found. Available: {list(year_data.keys())}"
+            )
     else:
         period_data = next(iter(year_data.values()))
 
@@ -146,7 +169,7 @@ def read_catalog_entry(
         raise ValueError("No matching modules found.")
 
     mod = mods[0]
-    from inei_microdatos.download import module_download, _download_one
+    from inei_microdatos.download import _download_one, module_download
 
     selected = module_download(mod, fmt)
     if not selected:
@@ -162,19 +185,29 @@ def read_catalog_entry(
         dest_path = Path(dest) / f"{code}{extension}"
     else:
         import tempfile
-        dest_path = Path(tempfile.gettempdir()) / "inei_microdatos" / f"{code}{extension}"
+
+        dest_path = (
+            Path(tempfile.gettempdir()) / "inei_microdatos" / f"{code}{extension}"
+        )
 
     status = _download_one(url, dest_path)
     if status == "unavailable":
         from inei_microdatos.geography import GeographyUnavailable
-        raise GeographyUnavailable(f"Module {mod['module_name']} has no tables for ubigeo {mod['geography']['code']}")
+
+        raise GeographyUnavailable(
+            f"Module {mod['module_name']} has no tables for ubigeo {mod['geography']['code']}"
+        )
     if status not in ("ok", "skipped", "empty", "partial"):
         raise OSError(f"Could not download module {mod['module_name']}: {status}")
 
     frames = read_module(dest_path, fmt=actual_fmt.lower())
     if mod.get("geography", {}).get("names"):
         for frame in frames.values():
-            frame.attrs.update(ubigeo=mod["geography"]["code"], census_year=year, geography=mod["geography"]["names"])
+            frame.attrs.update(
+                ubigeo=mod["geography"]["code"],
+                census_year=year,
+                geography=mod["geography"]["names"],
+            )
     return frames
 
 
@@ -189,35 +222,51 @@ def list_tables(source: str | Path) -> list[dict]:
         if not _valid_legacy_excel(path):  # Reject error pages disguised as Excel.
             raise ValueError("No census table in Excel export")
         name = _legacy_table_name(path)
-        return [{"name": name, "format": "xls",
-                 "size_bytes": path.stat().st_size, "full_path": name}]
+        return [
+            {
+                "name": name,
+                "format": "xls",
+                "size_bytes": path.stat().st_size,
+                "full_path": name,
+            }
+        ]
     if path.suffix.lower() == ".xlsx":
         from xml.etree import ElementTree as ET
+
         with zipfile.ZipFile(path) as workbook:
             root = ET.fromstring(workbook.read("xl/workbook.xml"))
             rels = ET.fromstring(workbook.read("xl/_rels/workbook.xml.rels"))
             targets = {rel.attrib["Id"]: rel.attrib["Target"] for rel in rels}
             result = []
             for sheet in root.findall(".//{*}sheet"):
-                rel_id = sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
+                rel_id = sheet.attrib[
+                    "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+                ]
                 target = targets[rel_id]
-                target = target.lstrip("/") if target.startswith("/") else "xl/" + target
-                result.append({
-                    "name": sheet.attrib["name"], "format": "xlsx",
-                    "size_bytes": workbook.getinfo(target).file_size,
-                    "full_path": target,
-                })
+                target = (
+                    target.lstrip("/") if target.startswith("/") else "xl/" + target
+                )
+                result.append(
+                    {
+                        "name": sheet.attrib["name"],
+                        "format": "xlsx",
+                        "size_bytes": workbook.getinfo(target).file_size,
+                        "full_path": target,
+                    }
+                )
             return result
     result = []
     with zipfile.ZipFile(path) as zf:
         for name, detected_fmt, table_name in _find_data_files(zf.namelist()):
             info = zf.getinfo(name)
-            result.append({
-                "name": table_name,
-                "format": detected_fmt,
-                "size_bytes": info.file_size,
-                "full_path": name,
-            })
+            result.append(
+                {
+                    "name": table_name,
+                    "format": detected_fmt,
+                    "size_bytes": info.file_size,
+                    "full_path": name,
+                }
+            )
     return result
 
 
@@ -259,7 +308,7 @@ def _parse_sylk(text: str) -> tuple[dict, int, int]:
         if x < 1 or y < 1 or x > 256 or y > 65536:
             raise ValueError("Invalid SYLK cell coordinates")
         if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1].replace('""', '"').replace(';;', ';')
+            value = value[1:-1].replace('""', '"').replace(";;", ";")
         elif re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?", value):
             value = float(value)
         else:
@@ -323,6 +372,7 @@ def _read_legacy_excel(path: Path):
     """Read INEI HTML or SYLK Excel exports, preserving heading rows."""
     assert_optional_import("pandas", extra="pandas", min_version="1.2")
     import re
+
     import pandas as pd
 
     text = _legacy_excel_text(path)
@@ -330,13 +380,15 @@ def _read_legacy_excel(path: Path):
         return _read_sylk(text)
     # Prevent pandas from promoting the multirow heading to column labels.
     text = re.sub(r"<(/?)thead\b", r"<\1tbody", text, flags=re.I)
-    frames = pd.read_html(io.StringIO(text), attrs={"id": "tabDetalle"}, header=None, flavor="lxml")
+    frames = pd.read_html(
+        io.StringIO(text), attrs={"id": "tabDetalle"}, header=None, flavor="lxml"
+    )
     if not frames or frames[0].empty:
         raise ValueError("No census table in Excel export")
     return frames[0]
 
 
-def _find_data_files(names: List[str]) -> List[tuple]:
+def _find_data_files(names: list[str]) -> list[tuple]:
     """Return (zip_path, format, table_name) for each data file."""
     results = []
     for name in names:
@@ -348,7 +400,11 @@ def _find_data_files(names: List[str]) -> List[tuple]:
                 # Remove common year suffixes like _2024, _2023
                 table = basename
                 for suffix_len in [5, 6]:  # _2024 or _02024
-                    if len(table) > suffix_len and table[-suffix_len] == "_" and table[-suffix_len + 1:].isdigit():
+                    if (
+                        len(table) > suffix_len
+                        and table[-suffix_len] == "_"
+                        and table[-suffix_len + 1 :].isdigit()
+                    ):
                         table = table[:-suffix_len]
                         break
                 results.append((name, fmt, table))
@@ -385,6 +441,7 @@ def _read_data(data: io.BytesIO, fmt: str, name: str) -> "pandas.DataFrame":
         except Exception:
             # read_spss doesn't accept BytesIO in older pandas, write to temp
             import tempfile
+
             with tempfile.NamedTemporaryFile(suffix=".sav", delete=False) as tmp:
                 tmp.write(data.read())
                 tmp_path = tmp.name
@@ -399,6 +456,7 @@ def _read_data(data: io.BytesIO, fmt: str, name: str) -> "pandas.DataFrame":
 def _download_to_temp(code: str, fmt: Optional[str] = None) -> str:
     """Download a module by code to a temp directory."""
     import tempfile
+
     import requests
 
     fmt = (fmt or "csv").upper()

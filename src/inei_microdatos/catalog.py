@@ -9,8 +9,7 @@ from typing import Any, Optional
 
 from tqdm import tqdm
 
-from inei_microdatos.client import INEIClient, Survey, Period, Module, Doc, PeriodData
-
+from inei_microdatos.client import Doc, INEIClient, Module
 
 # Serialization key for the catalog format
 _VERSION = 1
@@ -38,7 +37,11 @@ def build_catalog(
         client = INEIClient()
 
     from inei_microdatos.aliases import resolve_alias
-    from inei_microdatos.census import CENSUS_LABEL, build_census_catalog, requested_census_years
+    from inei_microdatos.census import (
+        CENSUS_LABEL,
+        build_census_catalog,
+        requested_census_years,
+    )
 
     queries = [resolve_alias(s).lower() for s in surveys] if surveys else None
     census_years = requested_census_years(surveys, years)
@@ -49,8 +52,7 @@ def build_catalog(
     if surveys:
         surveys_lower = queries
         all_surveys = [
-            s for s in all_surveys
-            if any(q in s.label.lower() for q in surveys_lower)
+            s for s in all_surveys if any(q in s.label.lower() for q in surveys_lower)
         ]
 
     catalog = []
@@ -68,10 +70,7 @@ def build_catalog(
         survey_years = client.get_years(survey)
 
         if years:
-            survey_years = [
-                y for y in survey_years
-                if years[0] <= int(y) <= years[1]
-            ]
+            survey_years = [y for y in survey_years if years[0] <= int(y) <= years[1]]
 
         for year in survey_years:
             periods = client.get_periods(survey, year)
@@ -95,6 +94,7 @@ def build_catalog(
         catalog.append(build_census_catalog(years=census_years))
 
     from inei_microdatos.survey_geography import annotate_catalog
+
     return annotate_catalog(_dedup_catalog(catalog))
 
 
@@ -144,8 +144,12 @@ def _split_by_methodology(anterior: dict, actualizada: dict) -> None:
 
     all_years = dict(old["years"])  # they're identical, pick either
 
-    old["years"] = {y: v for y, v in all_years.items() if int(y) < _METHODOLOGY_BOUNDARY}
-    new["years"] = {y: v for y, v in all_years.items() if int(y) >= _METHODOLOGY_BOUNDARY}
+    old["years"] = {
+        y: v for y, v in all_years.items() if int(y) < _METHODOLOGY_BOUNDARY
+    }
+    new["years"] = {
+        y: v for y, v in all_years.items() if int(y) >= _METHODOLOGY_BOUNDARY
+    }
 
 
 def save_catalog(catalog: list[dict], path: str | Path) -> None:
@@ -153,11 +157,16 @@ def save_catalog(catalog: list[dict], path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "version": _VERSION,
-            "crawled_at": datetime.now(timezone.utc).isoformat(),
-            "catalog": catalog,
-        }, f, ensure_ascii=False, indent=2)
+        json.dump(
+            {
+                "version": _VERSION,
+                "crawled_at": datetime.now(timezone.utc).isoformat(),
+                "catalog": catalog,
+            },
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
 
 
 def load_catalog(path: Optional[str | Path] = None) -> list[dict]:
@@ -203,6 +212,7 @@ def _read_timestamp(path: Path) -> Optional[str]:
 
 def _read_catalog_file(path: Path) -> list[dict]:
     from inei_microdatos.survey_geography import annotate_catalog
+
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     if isinstance(data, list):
@@ -224,8 +234,14 @@ def catalog_stats(catalog: list[dict]) -> dict[str, int]:
                 n_modules += len(mods)
                 n_docs += len(period_data["docs"])
                 n_downloadable += sum(
-                    1 for m in mods
-                    if m.get("csv_code") or m.get("stata_code") or m.get("spss_code") or m.get("xlsx_url") or m.get("xls_url") or m.get("redatam_query")
+                    1
+                    for m in mods
+                    if m.get("csv_code")
+                    or m.get("stata_code")
+                    or m.get("spss_code")
+                    or m.get("xlsx_url")
+                    or m.get("xls_url")
+                    or m.get("redatam_query")
                 )
     return {
         "surveys": n_surveys,
@@ -244,7 +260,7 @@ def filter_catalog(
     period: Optional[str] = None,
 ) -> list[dict]:
     """Filter catalog entries by survey name (or alias), year range, and/or period."""
-    from inei_microdatos.aliases import resolve_alias, ALIAS_YEARS
+    from inei_microdatos.aliases import ALIAS_YEARS, resolve_alias
 
     alias_year = ALIAS_YEARS.get(survey.lower()) if survey else None
     result = []
@@ -256,6 +272,7 @@ def filter_catalog(
         if sq:
             # Normalize Windows-1252 en-dash (\x96) and collapse whitespace
             import re as _re
+
             label_norm = _re.sub(r"[\x96\s]+", " ", entry["label"]).lower()
             sq_norm = _re.sub(r"\s+", " ", sq)
             if sq_norm not in label_norm:
@@ -274,8 +291,7 @@ def filter_catalog(
             if period:
                 pl = period.lower()
                 filtered_periods = {
-                    k: v for k, v in year_data.items()
-                    if pl in k.lower()
+                    k: v for k, v in year_data.items() if pl in k.lower()
                 }
             else:
                 filtered_periods = year_data
@@ -292,6 +308,7 @@ def filter_catalog(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _module_to_dict(m: Module) -> dict:
     return {

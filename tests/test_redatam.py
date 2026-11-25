@@ -9,19 +9,21 @@ from inei_microdatos.download import _download_one, _valid_download, module_down
 from inei_microdatos.reader import list_tables, read_module
 from inei_microdatos.redatam import ENGINE, export_excel, parse_frequency_form
 
-FORM = b'''<form method="POST">
+FORM = b"""<form method="POST">
 <input type="hidden" name="BASE" value="CPV1981">
 <input type="hidden" name="MAIN" value="WebServerMain.inl">
 <input type="hidden" name="ITEM" value="FREQPER">
 <input type="hidden" name="WEIGHT" value="PERSONA.FACTEXP">
 <select name="VARIABLE"><option value="PERSONA.SEXO">Sexo
-<option value="PERSONA.EDAD">Edad</select></form>'''
-SYLK = ('ID;PWXL;N;E\r\nC;Y1;X1;K"Sexo"\r\n'
-        'C;Y3;X1;K"Categorías"\r\nC;Y3;X2;K"Casos"\r\n'
-        'C;Y4;X1;K"Hombre"\r\nC;Y4;X2;K7931137.00\r\n'
-        'C;Y5;X1;K"Mujer"\r\nC;Y5;X2;K7977404.00\r\n'
-        'C;Y6;X1;K"Total"\r\nC;Y6;X2;K15908541.00\r\n'
-        'C;Y8;X1;K"INEI - CPV1981"\r\nE\r\n').encode("cp1252")
+<option value="PERSONA.EDAD">Edad</select></form>"""
+SYLK = (
+    'ID;PWXL;N;E\r\nC;Y1;X1;K"Sexo"\r\n'
+    'C;Y3;X1;K"Categorías"\r\nC;Y3;X2;K"Casos"\r\n'
+    'C;Y4;X1;K"Hombre"\r\nC;Y4;X2;K7931137.00\r\n'
+    'C;Y5;X1;K"Mujer"\r\nC;Y5;X2;K7977404.00\r\n'
+    'C;Y6;X1;K"Total"\r\nC;Y6;X2;K15908541.00\r\n'
+    'C;Y8;X1;K"INEI - CPV1981"\r\nE\r\n'
+).encode("cp1252")
 
 
 def test_discovery_preserves_weights_and_national_selection():
@@ -46,12 +48,18 @@ def session_responses(monkeypatch, export=SYLK):
     session = Mock()
     session.__enter__ = Mock(return_value=session)
     session.__exit__ = Mock(return_value=False)
-    session.post.return_value = Mock(content=b'<iframe src="http://censos1.inei.gob.pe/cgibin/WebUtilities.exe/Text?LFN=temporary.htm"></iframe>')
+    session.post.return_value = Mock(
+        content=b'<iframe src="http://censos1.inei.gob.pe/cgibin/WebUtilities.exe/Text?LFN=temporary.htm"></iframe>'
+    )
     session.get.side_effect = [
-        Mock(content=b'<a href="http://censos1.inei.gob.pe/cgibin/WebUtilities.exe/reporte.xls?LFN=temporary.xls">Excel</a>'),
+        Mock(
+            content=b'<a href="http://censos1.inei.gob.pe/cgibin/WebUtilities.exe/reporte.xls?LFN=temporary.xls">Excel</a>'
+        ),
         Mock(content=export),
     ]
-    monkeypatch.setattr("inei_microdatos.redatam.requests.Session", Mock(return_value=session))
+    monkeypatch.setattr(
+        "inei_microdatos.redatam.requests.Session", Mock(return_value=session)
+    )
     return session
 
 
@@ -83,8 +91,9 @@ def test_transient_failure_reruns_query(monkeypatch, tmp_path):
     assert session.post.call_count == 2
 
 
-@pytest.mark.parametrize("payload", [b"<html>Error</html>", SYLK[:-3],
-                                       b'ID;PWXL\nC;Y1;X1;K1;EEXEC()\nE\n'])
+@pytest.mark.parametrize(
+    "payload", [b"<html>Error</html>", SYLK[:-3], b"ID;PWXL\nC;Y1;X1;K1;EEXEC()\nE\n"]
+)
 def test_invalid_exports_rejected(payload, tmp_path):
     path = tmp_path / "bad.xls"
     path.write_bytes(payload)
@@ -97,6 +106,8 @@ def test_missing_export_and_foreign_output_rejected(monkeypatch):
     session.get.side_effect = [Mock(content=b"<html>Query failed</html>")]
     with pytest.raises(ValueError, match="Excel export"):
         export_excel(query)
-    session.post.return_value.content = b'<iframe src="https://example.com/file"></iframe>'
+    session.post.return_value.content = (
+        b'<iframe src="https://example.com/file"></iframe>'
+    )
     with pytest.raises(ValueError, match="output URL"):
         export_excel(query)

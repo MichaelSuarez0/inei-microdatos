@@ -64,7 +64,9 @@ inei-microdatos download --survey epen-deptos --year-min 2024 --year-max 2024 --
 from inei_microdatos import download_modules, read_catalog_entry, select_geography
 
 download_modules(catalog, "./data", ubigeo="150101")
-frames = read_catalog_entry(catalog[0], "2024", module="Vivienda", dest="./cache", ubigeo="150101")
+frames = read_catalog_entry(
+    catalog[0], "2024", module="Vivienda", dest="./cache", ubigeo="150101"
+)
 # El lector descarga automáticamente la tabla geográfica de apoyo de ENDES.
 for frame in frames.values():
     print(frame.attrs["ubigeo"], frame.attrs["geography_report"]["status"])

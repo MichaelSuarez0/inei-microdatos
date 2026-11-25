@@ -13,8 +13,6 @@ What it does:
 
 from __future__ import annotations
 
-import gzip
-import json
 import sys
 from pathlib import Path
 
@@ -22,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from inei_microdatos.catalog import build_catalog, load_catalog, save_catalog
 from inei_microdatos.client import INEIClient
-from inei_microdatos.variables import build_index, save_index, _read_index_file
+from inei_microdatos.variables import build_index
 
 BUNDLED_CATALOG = Path("src/inei_microdatos/data/catalog.json")
 BUNDLED_INDEX = Path("src/inei_microdatos/data/variable_index.json.gz")
@@ -44,7 +42,9 @@ def patch_catalog_year(bundled: list[dict], fresh: list[dict], year: str) -> lis
             fresh_years = fresh_by_value[val]["years"]
             if year in fresh_years:
                 entry["years"][year] = fresh_years[year]
-                print(f"  Patched {entry['label'][:60]} — {year}: {list(fresh_years[year].keys())}")
+                print(
+                    f"  Patched {entry['label'][:60]} — {year}: {list(fresh_years[year].keys())}"
+                )
 
     return bundled
 
@@ -69,6 +69,7 @@ def main():
     print("\nStep 3: Building variable index for ENAHO 2025...")
     # Filter to only ENAHO 2025 entries from the freshly patched catalog
     from inei_microdatos.catalog import filter_catalog
+
     enaho_2025 = filter_catalog(bundled, survey="enaho", year_min=2025, year_max=2025)
 
     new_entries = build_index(enaho_2025, dest=BUNDLED_INDEX, workers=4)

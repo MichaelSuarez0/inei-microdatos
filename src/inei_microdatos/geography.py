@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-from functools import lru_cache
-from itertools import islice, chain
-from pathlib import Path
 import re
 import unicodedata
+from copy import deepcopy
+from functools import lru_cache
+from itertools import chain, islice
+from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 
@@ -15,7 +15,7 @@ import requests
 from lxml import html
 
 from inei_microdatos._dependencies import assert_optional_import
-from inei_microdatos.census import CENSUS_VALUE, CENSUS_2007
+from inei_microdatos.census import CENSUS_2007, CENSUS_VALUE
 
 
 class GeographyUnavailable(ValueError):
@@ -23,12 +23,20 @@ class GeographyUnavailable(ValueError):
 
 
 def validate_ubigeo(ubigeo: str) -> str:
-    if not isinstance(ubigeo, str) or not re.fullmatch(r"(?:[0-9]{2}|[0-9]{4}|[0-9]{6})", ubigeo):
-        raise ValueError("ubigeo must be a string of 2, 4, or 6 digits (department, province, district)")
-    if any(ubigeo[i:i + 2] == "00" for i in range(0, len(ubigeo), 2)):
-        raise ValueError("Use 2 digits for a department, 4 for a province, or 6 for a district; no 00 components")
+    if not isinstance(ubigeo, str) or not re.fullmatch(
+        r"(?:[0-9]{2}|[0-9]{4}|[0-9]{6})", ubigeo
+    ):
+        raise ValueError(
+            "ubigeo must be a string of 2, 4, or 6 digits (department, province, district)"
+        )
+    if any(ubigeo[i : i + 2] == "00" for i in range(0, len(ubigeo), 2)):
+        raise ValueError(
+            "Use 2 digits for a department, 4 for a province, or 6 for a district; no 00 components"
+        )
     if not 1 <= int(ubigeo[:2]) <= 25:
-        raise ValueError("Use INEI ubigeo department codes 01–25, not the portal's special region codes")
+        raise ValueError(
+            "Use INEI ubigeo department codes 01–25, not the portal's special region codes"
+        )
     return ubigeo
 
 
@@ -37,7 +45,11 @@ def _name(value: str) -> str:
     value = "".join(c for c in value if not unicodedata.combining(c)).upper()
     value = re.sub(r"\s*\d+/\s*$", "", value)
     value = " ".join(value.split()).strip()
-    if value in {"PROV. CONST. DEL CALLAO", "PROV. CONSTITUCIONAL DEL CALLAO", "PROVINCIA CONSTITUCIONAL DEL CALLAO"}:
+    if value in {
+        "PROV. CONST. DEL CALLAO",
+        "PROV. CONSTITUCIONAL DEL CALLAO",
+        "PROVINCIA CONSTITUCIONAL DEL CALLAO",
+    }:
         return "CALLAO"
     if value in {"REGION LIMA", "LIMA METROPOLITANA"}:
         return "LIMA"
@@ -50,9 +62,12 @@ def _redatam_tree(content: bytes, encoding: str):
     if len(forms) != 1:
         raise ValueError("INEI did not return its geographic selection form")
     form = forms[0]
-    fields = {n.get("name"): n.get("value", "") for n in form.xpath('.//input[@type="hidden"]')}
+    fields = {
+        n.get("name"): n.get("value", "")
+        for n in form.xpath('.//input[@type="hidden"]')
+    }
     nodes = {}
-    for row in form.xpath('.//tr'):
+    for row in form.xpath(".//tr"):
         check = row.xpath('./td/input[starts-with(@name,"chk")]')
         if not check:
             continue
@@ -60,7 +75,9 @@ def _redatam_tree(content: bytes, encoding: str):
         match = re.search(r'\b([0-9]{2}(?:[0-9]{2}){0,2})\s+"([^"]+)"', text)
         if match:
             code, name = match.groups()
-            name = re.sub(r"^.*(?:Departamento|Provincia|Distrito):\s*", "", name, flags=re.I)
+            name = re.sub(
+                r"^.*(?:Departamento|Provincia|Distrito):\s*", "", name, flags=re.I
+            )
             nodes[code] = (check[0].get("name")[3:], name)
     return root, fields, nodes
 
@@ -68,19 +85,32 @@ def _redatam_tree(content: bytes, encoding: str):
 def _resolve_redatam(year: int, code: str) -> dict:
     modern = year == 2017
     base = "CPV2017DI" if modern else f"CPV{year}"
-    url = ("https://censos2017.inei.gob.pe/bininei/RpWebStats.exe/Selection" if modern
-           else "http://censos1.inei.gob.pe/cgibin/RpWebEngine.exe/Selection")
+    url = (
+        "https://censos2017.inei.gob.pe/bininei/RpWebStats.exe/Selection"
+        if modern
+        else "http://censos1.inei.gob.pe/cgibin/RpWebEngine.exe/Selection"
+    )
     encoding = "utf-8-sig" if modern else "cp1252"
-    fields = dict(BASE=base, NODE="0", EXPAND="TRUE", CODES="", CURCHECK="XX", CURCHECKVALUE="XX", FILENAME="")
+    fields = dict(
+        BASE=base,
+        NODE="0",
+        EXPAND="TRUE",
+        CODES="",
+        CURCHECK="XX",
+        CURCHECKVALUE="XX",
+        FILENAME="",
+    )
     if modern:
         fields["lang"] = "esp"
     names = []
     departments = []
     with requests.Session() as session:
+
         def post():
             response = session.post(url, data=fields, timeout=30)
             response.raise_for_status()
             return _redatam_tree(response.content, encoding)
+
         root, returned, nodes = post()
         fields.update(returned)
         if code[:2] not in nodes:
@@ -91,7 +121,9 @@ def _resolve_redatam(year: int, code: str) -> dict:
         for length in range(2, len(code) + 1, 2):
             prefix = code[:length]
             if prefix not in nodes:
-                raise GeographyUnavailable(f"Ubigeo {code} is not available in census {year}")
+                raise GeographyUnavailable(
+                    f"Ubigeo {code} is not available in census {year}"
+                )
             node, name = nodes[prefix]
             names.append(name)
             if length < len(code):
@@ -104,36 +136,59 @@ def _resolve_redatam(year: int, code: str) -> dict:
             root, _, _ = post()
             inline = "".join(root.xpath('//textarea[@name="seltext"]/text()')).strip()
             if not re.search(rf"\b{code}\b", inline):
-                raise ValueError("INEI did not confirm the requested geographic selection")
-    return {"code": code, "year": year, "names": names, "departments": departments,
-            "inline_selection": inline, "source_url": url}
+                raise ValueError(
+                    "INEI did not confirm the requested geographic selection"
+                )
+    return {
+        "code": code,
+        "year": year,
+        "names": names,
+        "departments": departments,
+        "inline_selection": inline,
+        "source_url": url,
+    }
 
 
 def _resolve_2007(code: str) -> dict:
     names, departments = [], []
     for length in range(0, len(code), 2):
-        response = requests.post(CENSUS_2007 + "ubigeo.asp", data={"anio": "07", "ubigeo": code[:length]}, timeout=30)
+        response = requests.post(
+            CENSUS_2007 + "ubigeo.asp",
+            data={"anio": "07", "ubigeo": code[:length]},
+            timeout=30,
+        )
         response.raise_for_status()
         root = ET.fromstring(response.content)
-        rows = {row.findtext("cod"): row.findtext("nom") for row in root.findall("dato")}
+        rows = {
+            row.findtext("cod"): row.findtext("nom") for row in root.findall("dato")
+        }
         if length == 0:
             departments = list(rows.values())
-        if code[:length + 2] not in rows:
+        if code[: length + 2] not in rows:
             raise GeographyUnavailable(f"Ubigeo {code} is not available in census 2007")
-        names.append(rows[code[:length + 2]])
-    return {"code": code, "year": 2007, "names": names, "departments": departments,
-            "source_url": CENSUS_2007 + "ubigeo.asp"}
+        names.append(rows[code[: length + 2]])
+    return {
+        "code": code,
+        "year": 2007,
+        "names": names,
+        "departments": departments,
+        "source_url": CENSUS_2007 + "ubigeo.asp",
+    }
 
 
 def _resolve_2025(code: str) -> dict:
     base = "https://censos2025.inei.gob.pe/api/v1/geografia/"
+
     def get(path, **params):
         response = requests.get(base + path, params=params, timeout=30)
         response.raise_for_status()
         payload = response.json()
         if payload.get("success") is not True or not payload.get("data"):
-            raise GeographyUnavailable(f"No official geography available for {code} in 2025")
+            raise GeographyUnavailable(
+                f"No official geography available for {code} in 2025"
+            )
         return payload["data"]
+
     deps = get("departamentos")
     departments = [d["nombre"] for d in deps]
     # INEI publishes Lima province as region 27, the other Lima provinces as 26.
@@ -143,19 +198,36 @@ def _resolve_2025(code: str) -> dict:
         raise GeographyUnavailable(f"Ubigeo {code} is not available in census 2025")
     names = ["LIMA" if code[:2] == "15" else dep["nombre"]]
     if len(code) >= 4:
-        prov = next((p for p in get("provincias", codRegion=region)
-                     if p["idGeografia"][1:] == code[:4] + "00"), None)
+        prov = next(
+            (
+                p
+                for p in get("provincias", codRegion=region)
+                if p["idGeografia"][1:] == code[:4] + "00"
+            ),
+            None,
+        )
         if not prov:
             raise GeographyUnavailable(f"Ubigeo {code} is not available in census 2025")
         names.append(prov["nombre"])
     if len(code) == 6:
-        district = next((d for d in get("distritos", codRegion=region, ccpp=code[2:4])
-                         if d["idGeografia"][1:] == code), None)
+        district = next(
+            (
+                d
+                for d in get("distritos", codRegion=region, ccpp=code[2:4])
+                if d["idGeografia"][1:] == code
+            ),
+            None,
+        )
         if not district:
             raise GeographyUnavailable(f"Ubigeo {code} is not available in census 2025")
         names.append(district["nombre"])
-    return {"code": code, "year": 2025, "names": names, "departments": departments,
-            "source_url": base}
+    return {
+        "code": code,
+        "year": 2025,
+        "names": names,
+        "departments": departments,
+        "source_url": base,
+    }
 
 
 @lru_cache(maxsize=128)
@@ -178,10 +250,19 @@ def select_census_geography(catalog: list[dict], ubigeo: str) -> list[dict]:
     """Return a new catalog scoped to a census-year ubigeo; never change the input."""
     code = validate_ubigeo(ubigeo)
     if not catalog or any(entry.get("value") != CENSUS_VALUE for entry in catalog):
-        raise ValueError("ubigeo selection requires a population/housing census catalog; filter survey='censo' first")
-    if any(mod.get("geography") for entry in catalog for periods in entry["years"].values()
-           for period in periods.values() for mod in period["modules"]):
-        raise ValueError("Select geography from the original national catalog, not an already scoped catalog")
+        raise ValueError(
+            "ubigeo selection requires a population/housing census catalog; filter survey='censo' first"
+        )
+    if any(
+        mod.get("geography")
+        for entry in catalog
+        for periods in entry["years"].values()
+        for period in periods.values()
+        for mod in period["modules"]
+    ):
+        raise ValueError(
+            "Select geography from the original national catalog, not an already scoped catalog"
+        )
     selected = deepcopy(catalog)
     for entry in selected:
         entry["geography"] = {"code": code}
@@ -192,15 +273,24 @@ def select_census_geography(catalog: list[dict], ubigeo: str) -> list[dict]:
                 for mod in period["modules"]:
                     mod["geography"] = geography
                     if mod.get("redatam_query"):
-                        mod["redatam_query"]["data"].update(SELECT="SELUSER", INLINESELECTION=geography["inline_selection"])
+                        mod["redatam_query"]["data"].update(
+                            SELECT="SELUSER",
+                            INLINESELECTION=geography["inline_selection"],
+                        )
                     elif mod.get("xls_url"):
                         parts = urlsplit(mod["xls_url"])
                         params = parse_qs(parts.query)
                         params["u"] = [code]
-                        mod["xls_url"] = urlunsplit(parts._replace(query=urlencode(params, doseq=True)))
+                        mod["xls_url"] = urlunsplit(
+                            parts._replace(query=urlencode(params, doseq=True))
+                        )
                     elif mod.get("xlsx_url"):
-                        mod["geography_query"] = {"kind": "census_geography", "url": mod["xlsx_url"],
-                                                  "module_code": mod["module_code"], "geography": geography}
+                        mod["geography_query"] = {
+                            "kind": "census_geography",
+                            "url": mod["xlsx_url"],
+                            "module_code": mod["module_code"],
+                            "geography": geography,
+                        }
     return selected
 
 
@@ -213,9 +303,13 @@ def _marker(value, departments: set[str]):
         return -1, normalized
     if normalized in departments:
         return 0, normalized
-    match = re.fullmatch(r"(DEPARTAMENTO|PROVINCIA|DISTRITO)\s+(?:DE\s+)?(.+)", value, re.I)
+    match = re.fullmatch(
+        r"(DEPARTAMENTO|PROVINCIA|DISTRITO)\s+(?:DE\s+)?(.+)", value, re.I
+    )
     if match:
-        return ("DEPARTAMENTO", "PROVINCIA", "DISTRITO").index(match[1].upper()), _name(match[2])
+        return ("DEPARTAMENTO", "PROVINCIA", "DISTRITO").index(match[1].upper()), _name(
+            match[2]
+        )
     return None
 
 
@@ -244,9 +338,11 @@ def subset_rows(rows, geography: dict):
                 state[level:] = [name] + [None] * (2 - level)
         if not started:
             headers.append(row)
-        elif isinstance(first, str) and re.match(r"^\s*(?:Fuente\s*:|Nota\s*:|\d+/\s)", first, re.I):
+        elif isinstance(first, str) and re.match(
+            r"^\s*(?:Fuente\s*:|Nota\s*:|\d+/\s)", first, re.I
+        ):
             notes.append(row)
-        elif state[:len(target)] == target:
+        elif state[: len(target)] == target:
             selected.append(row)
     return headers + selected + notes if selected else []
 
@@ -254,15 +350,19 @@ def subset_rows(rows, geography: dict):
 def subset_workbook(source: Path, dest: Path, geography: dict) -> None:
     """Create a derived XLSX with source values, headers and geographic blocks."""
     assert_optional_import("openpyxl", extra="pandas", min_version="3.1")
-    from openpyxl import load_workbook, Workbook
+    from openpyxl import Workbook, load_workbook
+
     source_book = load_workbook(source, read_only=True, data_only=True)
     result = Workbook(write_only=True)
     try:
         for sheet in source_book:
             iterator = sheet.iter_rows(values_only=True)
             first_rows = list(islice(iterator, 5))
-            if not any(isinstance(value, str) and re.match(r"^\s*CUADRO\b", value, re.I)
-                       for row in first_rows for value in row):
+            if not any(
+                isinstance(value, str) and re.match(r"^\s*CUADRO\b", value, re.I)
+                for row in first_rows
+                for value in row
+            ):
                 continue  # Presentation notes and annexes are not geographic tables.
             rows = subset_rows(chain(first_rows, iterator), geography)
             if not rows:
@@ -271,9 +371,13 @@ def subset_workbook(source: Path, dest: Path, geography: dict) -> None:
             for row in rows:
                 out.append(row)
         if not result.sheetnames:
-            raise GeographyUnavailable(f"No tables for ubigeo {geography['code']} in {source.name}")
-        result.properties.description = (f"Derived geographic subset; census {geography['year']}; "
-                                         f"ubigeo {geography['code']}; {' / '.join(geography['names'])}")
+            raise GeographyUnavailable(
+                f"No tables for ubigeo {geography['code']} in {source.name}"
+            )
+        result.properties.description = (
+            f"Derived geographic subset; census {geography['year']}; "
+            f"ubigeo {geography['code']}; {' / '.join(geography['names'])}"
+        )
         result.save(dest)
     finally:
         source_book.close()

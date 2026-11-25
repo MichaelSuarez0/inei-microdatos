@@ -27,8 +27,14 @@ def workbook_tables(path: Path) -> list[dict]:
                             if re.match(r"^CUADRO\b", value, re.I):
                                 titles.append(value)
                 if titles:
-                    tables.append({"name": sheet.title, "label": " ".join(dict.fromkeys(titles)),
-                                   "kind": "table", "table": sheet.title})
+                    tables.append(
+                        {
+                            "name": sheet.title,
+                            "label": " ".join(dict.fromkeys(titles)),
+                            "kind": "table",
+                            "table": sheet.title,
+                        }
+                    )
         finally:
             workbook.close()
     if not tables:
@@ -43,10 +49,17 @@ def index_census_module(mod_info: dict, data_dir=None) -> dict:
     mod = mod_info["census_module"]
     query = mod.get("redatam_query")
     if query:
-        variables = [{"name": query["data"]["VARIABLE"], "label": mod["module_name"],
-                      "kind": "variable"}]
+        variables = [
+            {
+                "name": query["data"]["VARIABLE"],
+                "label": mod["module_name"],
+                "kind": "variable",
+            }
+        ]
     elif mod.get("xlsx_url"):
-        cached = list(Path(data_dir).rglob(mod["module_code"] + ".xlsx")) if data_dir else []
+        cached = (
+            list(Path(data_dir).rglob(mod["module_code"] + ".xlsx")) if data_dir else []
+        )
         if len(cached) > 1:
             raise ValueError(f"Multiple cached workbooks for {mod['module_code']}")
         if cached:
@@ -60,13 +73,30 @@ def index_census_module(mod_info: dict, data_dir=None) -> dict:
                 variables = workbook_tables(path)
     elif mod.get("xls_url"):
         # The 2007 catalog already contains the official full table title.
-        variables = [{"name": mod["module_code"], "label": mod["module_name"],
-                      "kind": "table", "table": "tabDetalle"}]
+        variables = [
+            {
+                "name": mod["module_code"],
+                "label": mod["module_name"],
+                "kind": "table",
+                "table": "tabDetalle",
+            }
+        ]
     else:
         raise ValueError("No indexable census metadata")
     return {
-        **{key: mod_info[key] for key in ("survey", "category", "year", "period",
-                                         "module_code", "module_name", "format")},
-        "data_kind": "aggregate_tables", "source_url": mod_info["source_url"],
+        **{
+            key: mod_info[key]
+            for key in (
+                "survey",
+                "category",
+                "year",
+                "period",
+                "module_code",
+                "module_name",
+                "format",
+            )
+        },
+        "data_kind": "aggregate_tables",
+        "source_url": mod_info["source_url"],
         "variables": variables,
     }

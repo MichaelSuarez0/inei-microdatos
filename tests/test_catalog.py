@@ -1,8 +1,6 @@
 """Tests for catalog module."""
 
 import json
-import tempfile
-from pathlib import Path
 
 from inei_microdatos.catalog import (
     catalog_stats,
@@ -21,14 +19,30 @@ SAMPLE_CATALOG = [
                 "Unico": {
                     "period_value": "5",
                     "modules": [
-                        {"survey_code": "968", "module_code": "1629", "module_name": "Hogar",
-                         "csv_code": "968-Modulo1629", "stata_code": "968-Modulo1629", "spss_code": "968-Modulo1629"},
-                        {"survey_code": "968", "module_code": "1630", "module_name": "Vivienda",
-                         "csv_code": "968-Modulo1630", "stata_code": None, "spss_code": None},
+                        {
+                            "survey_code": "968",
+                            "module_code": "1629",
+                            "module_name": "Hogar",
+                            "csv_code": "968-Modulo1629",
+                            "stata_code": "968-Modulo1629",
+                            "spss_code": "968-Modulo1629",
+                        },
+                        {
+                            "survey_code": "968",
+                            "module_code": "1630",
+                            "module_name": "Vivienda",
+                            "csv_code": "968-Modulo1630",
+                            "stata_code": None,
+                            "spss_code": None,
+                        },
                     ],
                     "docs": [
-                        {"doc_code": "01", "doc_name": "Cuestionario", "zip_path": "2024-5/Cuestionario.zip",
-                         "ficha_params": None},
+                        {
+                            "doc_code": "01",
+                            "doc_name": "Cuestionario",
+                            "zip_path": "2024-5/Cuestionario.zip",
+                            "ficha_params": None,
+                        },
                     ],
                 }
             },
@@ -36,8 +50,14 @@ SAMPLE_CATALOG = [
                 "Unico": {
                     "period_value": "5",
                     "modules": [
-                        {"survey_code": "950", "module_code": "1500", "module_name": "Hogar",
-                         "csv_code": "950-Modulo1500", "stata_code": None, "spss_code": None},
+                        {
+                            "survey_code": "950",
+                            "module_code": "1500",
+                            "module_name": "Hogar",
+                            "csv_code": "950-Modulo1500",
+                            "stata_code": None,
+                            "spss_code": None,
+                        },
                     ],
                     "docs": [],
                 }
@@ -53,8 +73,14 @@ SAMPLE_CATALOG = [
                 "Anual": {
                     "period_value": "55",
                     "modules": [
-                        {"survey_code": "966", "module_code": "01", "module_name": "Mod01",
-                         "csv_code": "966-Modulo01", "stata_code": "966-Modulo01", "spss_code": "966-Modulo01"},
+                        {
+                            "survey_code": "966",
+                            "module_code": "01",
+                            "module_name": "Mod01",
+                            "csv_code": "966-Modulo01",
+                            "stata_code": "966-Modulo01",
+                            "spss_code": "966-Modulo01",
+                        },
                     ],
                     "docs": [],
                 }

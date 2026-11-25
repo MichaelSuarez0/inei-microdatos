@@ -21,12 +21,14 @@ from inei_microdatos.download import LAYOUTS, download_docs, download_modules
 
 DEFAULT_CATALOG = Path.home() / ".inei-microdatos" / "catalog.json"
 
-SURVEY_HELP = 'Survey name or alias (e.g. "enaho", "endes", "censo"). Run `aliases` to see all.'
+SURVEY_HELP = (
+    'Survey name or alias (e.g. "enaho", "endes", "censo"). Run `aliases` to see all.'
+)
 CATALOG_HELP = "Path to catalog JSON file (defaults to bundled catalog)."
 LAYOUT_HELP = (
     "Folder layout for downloaded files. Presets: "
     + ", ".join(f'"{k}" ({v})' for k, v in LAYOUTS.items())
-    + '. Or a custom template with {survey}, {year}, {period}, {code}, {module_name}, {format}.'
+    + ". Or a custom template with {survey}, {year}, {period}, {code}, {module_name}, {format}."
 )
 
 
@@ -45,8 +47,13 @@ def cli():
 
 
 @cli.command()
-@click.option("--catalog", "catalog_path", type=click.Path(), default=str(DEFAULT_CATALOG),
-              help=CATALOG_HELP)
+@click.option(
+    "--catalog",
+    "catalog_path",
+    type=click.Path(),
+    default=str(DEFAULT_CATALOG),
+    help=CATALOG_HELP,
+)
 @click.option("--refresh", is_flag=True, help="Force re-crawl even if catalog exists.")
 @click.option("--survey", multiple=True, help=SURVEY_HELP)
 @click.option("--year-min", type=int, help="Minimum year.")
@@ -74,8 +81,13 @@ def crawl(catalog_path, refresh, survey, year_min, year_max):
 
 
 @cli.command("list")
-@click.option("--catalog", "catalog_path", type=click.Path(), default=str(DEFAULT_CATALOG),
-              help=CATALOG_HELP)
+@click.option(
+    "--catalog",
+    "catalog_path",
+    type=click.Path(),
+    default=str(DEFAULT_CATALOG),
+    help=CATALOG_HELP,
+)
 @click.option("--survey", help=SURVEY_HELP)
 @click.option("--year-min", type=int, help="Minimum year.")
 @click.option("--year-max", type=int, help="Maximum year.")
@@ -90,7 +102,9 @@ def list_cmd(catalog_path, survey, year_min, year_max, period):
       inei-microdatos list --survey cenagro
     """
     catalog = load_catalog(catalog_path)
-    catalog = filter_catalog(catalog, survey=survey, year_min=year_min, year_max=year_max, period=period)
+    catalog = filter_catalog(
+        catalog, survey=survey, year_min=year_min, year_max=year_max, period=period
+    )
 
     if not catalog:
         click.echo("No matching surveys found.")
@@ -99,50 +113,101 @@ def list_cmd(catalog_path, survey, year_min, year_max, period):
     for entry in catalog:
         years = sorted(entry["years"].keys())
         n_mods = sum(
-            len(p["modules"])
-            for yd in entry["years"].values()
-            for p in yd.values()
+            len(p["modules"]) for yd in entry["years"].values() for p in yd.values()
         )
         n_docs = sum(
-            len(p["docs"])
-            for yd in entry["years"].values()
-            for p in yd.values()
+            len(p["docs"]) for yd in entry["years"].values() for p in yd.values()
         )
         yr_range = f"{years[0]}-{years[-1]}" if years else "N/A"
         click.echo(f"  [{entry['category'][:3]}] {entry['label']}")
         if entry.get("data_kind") == "aggregate_tables":
-            click.echo("        Aggregated tables | National selection (Perú), not microdata")
+            click.echo(
+                "        Aggregated tables | National selection (Perú), not microdata"
+            )
             for year in years:
                 for period_data in entry["years"][year].values():
-                    formats = sorted({f for m in period_data["modules"] for f in ("XLS", "XLSX") if m.get(f.lower() + "_url") or (f == "XLS" and m.get("redatam_query"))})
+                    formats = sorted(
+                        {
+                            f
+                            for m in period_data["modules"]
+                            for f in ("XLS", "XLSX")
+                            if m.get(f.lower() + "_url")
+                            or (f == "XLS" and m.get("redatam_query"))
+                        }
+                    )
                     if formats:
-                        click.echo(f"        {year}: {len(period_data['modules'])} modules | {', '.join(formats)}")
+                        click.echo(
+                            f"        {year}: {len(period_data['modules'])} modules | {', '.join(formats)}"
+                        )
                         if period_data.get("access") == "query_export":
-                            click.echo("          REDATAM national frequencies generated on demand")
+                            click.echo(
+                                "          REDATAM national frequencies generated on demand"
+                            )
                     else:
-                        click.echo(f"        {year}: online query only; no automated downloads")
+                        click.echo(
+                            f"        {year}: online query only; no automated downloads"
+                        )
                         for resource in period_data.get("resources", []):
-                            click.echo(f"          {resource['name']}: {resource['url']}")
-        click.echo(f"        {yr_range} | {len(years)} years | {n_mods} modules | {n_docs} docs")
+                            click.echo(
+                                f"          {resource['name']}: {resource['url']}"
+                            )
+        click.echo(
+            f"        {yr_range} | {len(years)} years | {n_mods} modules | {n_docs} docs"
+        )
 
 
 @cli.command()
-@click.option("--catalog", "catalog_path", type=click.Path(), default=str(DEFAULT_CATALOG),
-              help=CATALOG_HELP)
+@click.option(
+    "--catalog",
+    "catalog_path",
+    type=click.Path(),
+    default=str(DEFAULT_CATALOG),
+    help=CATALOG_HELP,
+)
 @click.option("--survey", help=SURVEY_HELP)
 @click.option("--year-min", type=int, help="Minimum year.")
 @click.option("--year-max", type=int, help="Maximum year.")
 @click.option("--period", help="Filter to periods matching this substring.")
-@click.option("--format", "fmt", type=click.Choice(["CSV", "STATA", "SPSS", "XLSX", "XLS"], case_sensitive=False), default="CSV",
-              help="Download format (default: CSV).")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["CSV", "STATA", "SPSS", "XLSX", "XLS"], case_sensitive=False),
+    default="CSV",
+    help="Download format (default: CSV).",
+)
 @click.option("--dest", type=click.Path(), required=True, help="Destination directory.")
 @click.option("--layout", default="default", help=LAYOUT_HELP)
-@click.option("--workers", type=int, default=4, help="Parallel download threads (default: 4).")
-@click.option("--no-fallback", is_flag=True, help="Don't fall back to another format when preferred isn't available.")
-@click.option("--dry-run", is_flag=True, help="Show what would be downloaded without downloading.")
+@click.option(
+    "--workers", type=int, default=4, help="Parallel download threads (default: 4)."
+)
+@click.option(
+    "--no-fallback",
+    is_flag=True,
+    help="Don't fall back to another format when preferred isn't available.",
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be downloaded without downloading."
+)
 @click.option("--include-docs", is_flag=True, help="Also download documentation.")
-@click.option("--ubigeo", help="INEI code: 2 digits department, 4 province, 6 district; verified datasets only.")
-def download(catalog_path, survey, year_min, year_max, period, fmt, dest, layout, workers, no_fallback, dry_run, include_docs, ubigeo):
+@click.option(
+    "--ubigeo",
+    help="INEI code: 2 digits department, 4 province, 6 district; verified datasets only.",
+)
+def download(
+    catalog_path,
+    survey,
+    year_min,
+    year_max,
+    period,
+    fmt,
+    dest,
+    layout,
+    workers,
+    no_fallback,
+    dry_run,
+    include_docs,
+    ubigeo,
+):
     """Download microdata files or aggregate census tables.
 
     \b
@@ -152,37 +217,60 @@ def download(catalog_path, survey, year_min, year_max, period, fmt, dest, layout
       inei-microdatos download --survey endes --dest ./data/ --dry-run
     """
     catalog = load_catalog(catalog_path)
-    catalog = filter_catalog(catalog, survey=survey, year_min=year_min, year_max=year_max, period=period)
+    catalog = filter_catalog(
+        catalog, survey=survey, year_min=year_min, year_max=year_max, period=period
+    )
 
     if not catalog:
         click.echo("No matching data found.")
         return
 
     stats = catalog_stats(catalog)
-    click.echo(f"Matched: {stats['surveys']} surveys, {stats['downloadable_modules']} downloadable modules")
+    click.echo(
+        f"Matched: {stats['surveys']} surveys, {stats['downloadable_modules']} downloadable modules"
+    )
 
     if ubigeo and any(e.get("data_kind") != "aggregate_tables" for e in catalog):
-        click.echo("Survey geographic selection: downloads source CSV ZIPs and creates derived CSV ZIPs. "
-                   "Coverage varies by year and table; use 'geography' to inspect it offline.")
+        click.echo(
+            "Survey geographic selection: downloads source CSV ZIPs and creates derived CSV ZIPs. "
+            "Coverage varies by year and table; use 'geography' to inspect it offline."
+        )
 
     if any(e.get("data_kind") == "aggregate_tables" for e in catalog):
         if ubigeo:
-            click.echo(f"Census geographic selection: {ubigeo}. XLSX files contain derived subsets; tables without this geography are reported as unavailable.")
+            click.echo(
+                f"Census geographic selection: {ubigeo}. XLSX files contain derived subsets; tables without this geography are reported as unavailable."
+            )
         else:
-            click.echo("Population and housing census: original aggregate XLS/XLSX tables; no microdata or CSV conversion.")
+            click.echo(
+                "Population and housing census: original aggregate XLS/XLSX tables; no microdata or CSV conversion."
+            )
         for entry in catalog:
             for year, periods in entry["years"].items():
                 for data in periods.values():
                     if data.get("access") == "query_export":
                         scope = f"ubigeo {ubigeo}" if ubigeo else "national"
-                        click.echo(f"{year}: generating {scope} REDATAM frequency tables; server requests run sequentially.")
+                        click.echo(
+                            f"{year}: generating {scope} REDATAM frequency tables; server requests run sequentially."
+                        )
                     if data.get("access") == "online_query":
-                        click.echo(f"{year}: online query only; automated download unavailable.")
+                        click.echo(
+                            f"{year}: online query only; automated download unavailable."
+                        )
                         for resource in data.get("resources", []):
                             click.echo(f"  {resource['url']}")
 
     try:
-        result = download_modules(catalog, dest, fmt=fmt, fallback=not no_fallback, layout=layout, workers=workers, dry_run=dry_run, ubigeo=ubigeo)
+        result = download_modules(
+            catalog,
+            dest,
+            fmt=fmt,
+            fallback=not no_fallback,
+            layout=layout,
+            workers=workers,
+            dry_run=dry_run,
+            ubigeo=ubigeo,
+        )
     except (ValueError, requests.RequestException, OptionalDependencyError) as exc:
         raise click.ClickException(str(exc)) from exc
     if dry_run:
@@ -191,28 +279,45 @@ def download(catalog_path, survey, year_min, year_max, period, fmt, dest, layout
             download_docs(catalog, dest, layout=layout, dry_run=True)
         return
 
-    click.echo(f"\nModules: {result['ok']} downloaded, {result['skipped']} skipped, {result['failed']} failed, {result['bad_zip']} bad")
+    click.echo(
+        f"\nModules: {result['ok']} downloaded, {result['skipped']} skipped, {result['failed']} failed, {result['bad_zip']} bad"
+    )
     if result.get("unavailable"):
-        click.echo(f"{result['unavailable']} modules have no verified selection available for ubigeo {ubigeo}.")
+        click.echo(
+            f"{result['unavailable']} modules have no verified selection available for ubigeo {ubigeo}."
+        )
     if result.get("empty"):
-        click.echo(f"{result['empty']} modules support the selection but contain no matching observations.")
+        click.echo(
+            f"{result['empty']} modules support the selection but contain no matching observations."
+        )
     if result.get("partial"):
-        click.echo(f"{result['partial']} modules produced partial subsets: some source records could not be located. See geography.json in each ZIP.")
+        click.echo(
+            f"{result['partial']} modules produced partial subsets: some source records could not be located. See geography.json in each ZIP."
+        )
 
     if include_docs:
         doc_result = download_docs(catalog, dest, layout=layout, workers=workers)
-        click.echo(f"Docs: {doc_result['ok']} downloaded, {doc_result['skipped']} skipped, {doc_result['failed']} failed")
+        click.echo(
+            f"Docs: {doc_result['ok']} downloaded, {doc_result['skipped']} skipped, {doc_result['failed']} failed"
+        )
 
 
 @cli.command()
-@click.option("--catalog", "catalog_path", type=click.Path(), default=str(DEFAULT_CATALOG),
-              help=CATALOG_HELP)
+@click.option(
+    "--catalog",
+    "catalog_path",
+    type=click.Path(),
+    default=str(DEFAULT_CATALOG),
+    help=CATALOG_HELP,
+)
 @click.option("--survey", help=SURVEY_HELP)
 @click.option("--year-min", type=int, help="Minimum year.")
 @click.option("--year-max", type=int, help="Maximum year.")
 @click.option("--dest", type=click.Path(), required=True, help="Destination directory.")
 @click.option("--layout", default="default", help=LAYOUT_HELP)
-@click.option("--workers", type=int, default=4, help="Parallel download threads (default: 4).")
+@click.option(
+    "--workers", type=int, default=4, help="Parallel download threads (default: 4)."
+)
 def docs(catalog_path, survey, year_min, year_max, dest, layout, workers):
     """Download documentation files only (questionnaires, dictionaries, fichas).
 
@@ -222,22 +327,34 @@ def docs(catalog_path, survey, year_min, year_max, dest, layout, workers):
       inei-microdatos docs --survey enaho --year-min 2024 --dest ./docs/
     """
     catalog = load_catalog(catalog_path)
-    catalog = filter_catalog(catalog, survey=survey, year_min=year_min, year_max=year_max)
+    catalog = filter_catalog(
+        catalog, survey=survey, year_min=year_min, year_max=year_max
+    )
 
     if not catalog:
         click.echo("No matching data found.")
         return
 
     result = download_docs(catalog, dest, layout=layout, workers=workers)
-    click.echo(f"\nDocs: {result['ok']} downloaded, {result['skipped']} skipped, {result['failed']} failed")
+    click.echo(
+        f"\nDocs: {result['ok']} downloaded, {result['skipped']} skipped, {result['failed']} failed"
+    )
 
 
 @cli.command()
 @click.argument("source")
-@click.option("--table", "-t", multiple=True, help="Table names to read (reads all if omitted).")
-@click.option("--format", "fmt", type=click.Choice(["csv", "stata", "spss", "xlsx", "xls"], case_sensitive=False),
-              help="Format hint (auto-detected if omitted).")
-@click.option("--info", is_flag=True, help="Just list tables or workbook sheets, don't read.")
+@click.option(
+    "--table", "-t", multiple=True, help="Table names to read (reads all if omitted)."
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["csv", "stata", "spss", "xlsx", "xls"], case_sensitive=False),
+    help="Format hint (auto-detected if omitted).",
+)
+@click.option(
+    "--info", is_flag=True, help="Just list tables or workbook sheets, don't read."
+)
 def read(source, table, fmt, info):
     """Read a module ZIP, XLSX workbook, or census XLS export and show its contents.
 
@@ -330,8 +447,12 @@ def search_cmd(query, survey, year, module, exact):
         yr_str = f"{years[0]}-{years[-1]}" if len(years) > 1 else years[0]
         click.echo(f"  {var_name:<20} {label[:50]}")
         if any(m["data_kind"] == "aggregate_tables" for m in matches):
-            click.echo("                       [REDATAM variable; aggregate query output]")
-        click.echo(f"  {'':20} {surveys[0]} | {yr_str} ({len(years)} years, {len(matches)} modules)")
+            click.echo(
+                "                       [REDATAM variable; aggregate query output]"
+            )
+        click.echo(
+            f"  {'':20} {surveys[0]} | {yr_str} ({len(years)} years, {len(matches)} modules)"
+        )
         if len(surveys) > 1:
             for s in surveys[1:]:
                 click.echo(f"  {'':20} {s}")
@@ -380,22 +501,40 @@ def track_cmd(variable, survey):
 
     # Summary
     all_years = sorted(by_year.keys())
-    click.echo(f"\n  Present in {len(all_years)} years ({all_years[0]}-{all_years[-1]})")
+    click.echo(
+        f"\n  Present in {len(all_years)} years ({all_years[0]}-{all_years[-1]})"
+    )
 
 
 @cli.command("index")
-@click.option("--catalog", "catalog_path", type=click.Path(), default=str(DEFAULT_CATALOG),
-              help=CATALOG_HELP)
+@click.option(
+    "--catalog",
+    "catalog_path",
+    type=click.Path(),
+    default=str(DEFAULT_CATALOG),
+    help=CATALOG_HELP,
+)
 @click.option("--survey", help=SURVEY_HELP + " Required.", required=True)
 @click.option("--year-min", type=int, help="Minimum year.")
 @click.option("--year-max", type=int, help="Maximum year.")
 @click.option("--period", help="Filter to periods matching this substring.")
-@click.option("--dest", type=click.Path(), default=str(Path.home() / ".inei-microdatos" / "variable_index.json.gz"),
-              help="Where to save the index.")
-@click.option("--workers", type=int, default=4, help="Parallel download threads (default: 4).")
-@click.option("--data-dir", type=click.Path(exists=True, file_okay=False),
-              help="Reuse downloaded census XLSX files under this directory.")
-def index_cmd(catalog_path, survey, year_min, year_max, period, dest, workers, data_dir):
+@click.option(
+    "--dest",
+    type=click.Path(),
+    default=str(Path.home() / ".inei-microdatos" / "variable_index.json.gz"),
+    help="Where to save the index.",
+)
+@click.option(
+    "--workers", type=int, default=4, help="Parallel download threads (default: 4)."
+)
+@click.option(
+    "--data-dir",
+    type=click.Path(exists=True, file_okay=False),
+    help="Reuse downloaded census XLSX files under this directory.",
+)
+def index_cmd(
+    catalog_path, survey, year_min, year_max, period, dest, workers, data_dir
+):
     """Index survey variables or census source variables and table titles.
 
     \b
@@ -412,23 +551,38 @@ def index_cmd(catalog_path, survey, year_min, year_max, period, dest, workers, d
     from inei_microdatos.variables import build_index
 
     catalog = load_catalog(catalog_path)
-    catalog = filter_catalog(catalog, survey=survey, year_min=year_min, year_max=year_max, period=period)
+    catalog = filter_catalog(
+        catalog, survey=survey, year_min=year_min, year_max=year_max, period=period
+    )
 
     if not catalog:
         click.echo("No matching data found.")
         return
 
-    n_mods = sum(len(p["modules"]) for e in catalog for y in e["years"].values() for p in y.values())
+    n_mods = sum(
+        len(p["modules"])
+        for e in catalog
+        for y in e["years"].values()
+        for p in y.values()
+    )
     click.echo(f"Indexing {n_mods} modules...")
 
     try:
-        new_entries = build_index(catalog, dest=dest, workers=workers, data_dir=data_dir)
+        new_entries = build_index(
+            catalog, dest=dest, workers=workers, data_dir=data_dir
+        )
     except OptionalDependencyError as exc:
         raise click.ClickException(str(exc)) from None
 
     click.echo(f"\nIndexed {len(new_entries)} modules.")
-    total_vars = sum(v.get("kind", "variable") == "variable" for e in new_entries for v in e["variables"])
-    total_tables = sum(v.get("kind") == "table" for e in new_entries for v in e["variables"])
+    total_vars = sum(
+        v.get("kind", "variable") == "variable"
+        for e in new_entries
+        for v in e["variables"]
+    )
+    total_tables = sum(
+        v.get("kind") == "table" for e in new_entries for v in e["variables"]
+    )
     click.echo(f"Total variables: {total_vars}")
     if total_tables:
         click.echo(f"Total census tables: {total_tables}")
@@ -449,6 +603,7 @@ def aliases():
       inei-microdatos download --survey endes --dest ./data/
     """
     from inei_microdatos.aliases import ALIASES
+
     click.echo(f"{'Alias':<20} {'Matches'}")
     click.echo("-" * 70)
     for alias, target in sorted(ALIASES.items()):
@@ -456,8 +611,13 @@ def aliases():
 
 
 @cli.command()
-@click.option("--catalog", "catalog_path", type=click.Path(), default=str(DEFAULT_CATALOG),
-              help=CATALOG_HELP)
+@click.option(
+    "--catalog",
+    "catalog_path",
+    type=click.Path(),
+    default=str(DEFAULT_CATALOG),
+    help=CATALOG_HELP,
+)
 def stats(catalog_path):
     """Show catalog statistics.
 
@@ -475,30 +635,56 @@ def stats(catalog_path):
 
 
 @cli.command("geography")
-@click.option("--catalog", "catalog_path", type=click.Path(), default=str(DEFAULT_CATALOG), help=CATALOG_HELP)
+@click.option(
+    "--catalog",
+    "catalog_path",
+    type=click.Path(),
+    default=str(DEFAULT_CATALOG),
+    help=CATALOG_HELP,
+)
 @click.option("--survey", help=SURVEY_HELP)
 @click.option("--year-min", type=int)
 @click.option("--year-max", type=int)
 @click.option("--period", help="Filter periods by substring.")
 @click.option("--module", help="Filter module names by substring.")
-@click.option("--json", "as_json", is_flag=True, help="Print machine-readable capability metadata.")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print machine-readable capability metadata.",
+)
 def geography_cmd(catalog_path, survey, year_min, year_max, period, module, as_json):
     """Inspect verified geographic levels per module/table, without downloading."""
     import json
+
     from inei_microdatos.survey_geography import geography_capabilities
-    catalog = filter_catalog(load_catalog(catalog_path), survey=survey, year_min=year_min,
-                             year_max=year_max, period=period)
+
+    catalog = filter_catalog(
+        load_catalog(catalog_path),
+        survey=survey,
+        year_min=year_min,
+        year_max=year_max,
+        period=period,
+    )
     capabilities = geography_capabilities(catalog)
     if module:
-        capabilities = [c for c in capabilities if module.lower() in c["module_name"].lower()]
+        capabilities = [
+            c for c in capabilities if module.lower() in c["module_name"].lower()
+        ]
     if as_json:
         click.echo(json.dumps(capabilities, ensure_ascii=False, indent=2))
         return
     for item in capabilities:
-        click.echo(f"{item['survey']} | {item['year']} | {item['period']} | {item['module_name']}")
-        click.echo(f"  {item['status']}: {', '.join(item['levels']) or 'no verified levels'}")
+        click.echo(
+            f"{item['survey']} | {item['year']} | {item['period']} | {item['module_name']}"
+        )
+        click.echo(
+            f"  {item['status']}: {', '.join(item['levels']) or 'no verified levels'}"
+        )
         for table in item["tables"]:
-            click.echo(f"    {table['table']}: {', '.join(table['levels']) or table.get('reason') or 'unsupported'} ({table['method']})")
+            click.echo(
+                f"    {table['table']}: {', '.join(table['levels']) or table.get('reason') or 'unsupported'} ({table['method']})"
+            )
 
 
 def _print_stats(s: dict):
