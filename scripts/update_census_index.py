@@ -6,9 +6,6 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
-
 from inei_microdatos.catalog import filter_catalog, load_catalog
 from inei_microdatos.census import CENSUS_LABEL
 from inei_microdatos.variables import (
@@ -17,6 +14,8 @@ from inei_microdatos.variables import (
     build_index,
     save_index,
 )
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def main():

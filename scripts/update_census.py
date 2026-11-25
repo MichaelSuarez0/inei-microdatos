@@ -1,10 +1,7 @@
 """Refresh only population and housing census tables in the bundled catalog (run from repo root)."""
 
 import json
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from inei_microdatos.census import CENSUS_VALUE, build_census_catalog
 
