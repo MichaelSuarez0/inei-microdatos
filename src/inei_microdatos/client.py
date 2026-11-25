@@ -13,7 +13,7 @@ import requests
 BASE_URL = "https://proyectos.inei.gob.pe/microdatos/"
 DOWNLOAD_BASE = "https://proyectos.inei.gob.pe/iinei/srienaho/descarga/"
 ENTRY_PAGE = "Consulta_por_Encuesta.asp?CU=19558"
-
+_TAG_RE = re.compile(r"<[^>]+>")
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -107,6 +107,10 @@ class _OptionParser(HTMLParser):
             self._inside = False
 
 
+def _strip_tags(s: str) -> str:
+    return _TAG_RE.sub("", s).strip()
+
+
 def _parse_options(html: str) -> list[tuple[str, str]]:
     p = _OptionParser()
     p.feed(html)
@@ -119,8 +123,7 @@ def _parse_modules(html: str) -> list[Module]:
         tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL)
         if len(tds) < 7:
             continue
-        clean = lambda s: re.sub(r"<[^>]+>", "", s).strip()
-        sc, mc, mn = clean(tds[3]), clean(tds[5]), clean(tds[6])
+        sc, mc, mn = _strip_tags(tds[3]), _strip_tags(tds[5]), _strip_tags(tds[6])
         if not sc or not mc:
             continue
         # Skip header row (contains HTML entities like "Código" or non-numeric codes)
@@ -148,8 +151,7 @@ def _parse_docs(html: str) -> list[Doc]:
         tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL)
         if len(tds) < 7:
             continue
-        clean = lambda s: re.sub(r"<[^>]+>", "", s).strip()
-        dc, dn = clean(tds[5]), clean(tds[6])
+        dc, dn = _strip_tags(tds[5]), _strip_tags(tds[6])
         if not dc:
             continue
         # Skip header row
